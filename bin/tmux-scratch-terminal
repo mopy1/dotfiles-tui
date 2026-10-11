@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+SESSION="terminal-flotante"
+TARGET_DIR="${1:-$HOME}"
+
+# Si la sesión no existe, la creamos en el directorio actual y sin barra de estado
+if ! tmux has-session -t "$SESSION" 2>/dev/null; then
+    tmux new-session -d -s "$SESSION" -c "$TARGET_DIR"
+    tmux set-option -t "$SESSION" status off
+fi
+
+# Conectarse a la sesión persistente
+exec tmux attach-session -t "$SESSION"

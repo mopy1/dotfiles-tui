@@ -1,0 +1,1 @@
+/home/lmc/.local/bin/toggle-theme

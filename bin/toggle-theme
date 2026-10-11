@@ -1,0 +1,106 @@
+#!/usr/bin/env bash
+# ==============================================================================
+# Script de alternancia de tema Claro (Alucard) / Oscuro (Dracula)
+# Sincroniza: Tmux + Neovim + Windows Terminal (si aplica)
+# ==============================================================================
+
+THEME_FILE="$HOME/.config/theme-mode"
+CURRENT_THEME="dark"
+if [ -f "$THEME_FILE" ]; then
+    CURRENT_THEME=$(tr -d '[:space:]' < "$THEME_FILE")
+fi
+
+# Determinar nuevo tema
+TARGET="$1"
+if [ -z "$TARGET" ]; then
+    if [ "$CURRENT_THEME" = "light" ]; then
+        TARGET="dark"
+    else
+        TARGET="light"
+    fi
+fi
+
+if [ "$TARGET" != "light" ] && [ "$TARGET" != "dark" ]; then
+    echo "Uso: toggle-theme [light|dark]"
+    exit 1
+fi
+
+# Guardar nuevo estado
+echo "$TARGET" > "$THEME_FILE"
+
+# ------------------------------------------------------------------------------
+# 1. TMUX
+# ------------------------------------------------------------------------------
+TMUX_THEME_CONF="$HOME/.config/tmux/theme-${TARGET}.conf"
+CURRENT_CONF="$HOME/.config/tmux/current-theme.conf"
+
+if [ -f "$TMUX_THEME_CONF" ]; then
+    cp "$TMUX_THEME_CONF" "$CURRENT_CONF"
+fi
+
+if [ -n "$TMUX" ] || tmux info >/dev/null 2>&1; then
+    if [ -f "$CURRENT_CONF" ]; then
+        tmux source-file "$CURRENT_CONF" 2>/dev/null || true
+    fi
+    if [ "$TARGET" = "light" ]; then
+        tmux display-message "☀ Tema: Modo Claro (Alucard)" 2>/dev/null || true
+    else
+        tmux display-message "🌙 Tema: Modo Oscuro (Dracula)" 2>/dev/null || true
+    fi
+fi
+
+# ------------------------------------------------------------------------------
+# 2. NEOVIM (Instancias activas)
+# ------------------------------------------------------------------------------
+UID_NUM=$(id -u)
+for sock in /run/user/"$UID_NUM"/nvim.* /tmp/nvim.*/0; do
+    if [ -S "$sock" ]; then
+        nvim --server "$sock" --remote-send "<Cmd>set background=${TARGET}<CR>" 2>/dev/null || true
+    fi
+done
+
+# ------------------------------------------------------------------------------
+# 3. WINDOWS TERMINAL (WSL)
+# ------------------------------------------------------------------------------
+WT_SETTINGS="/mnt/c/Users/lmc/AppData/Local/Packages/Microsoft.WindowsTerminal_8wekyb3d8bbwe/LocalState/settings.json"
+if [ -f "$WT_SETTINGS" ] && command -v python3 >/dev/null 2>&1; then
+    python3 -c "
+import json
+
+path = '$WT_SETTINGS'
+target = '$TARGET'
+scheme = 'One Half Light' if target == 'light' else 'One Half Dark'
+
+try:
+    with open(path, 'r', encoding='utf-8') as f:
+        data = json.load(f)
+    
+    modified = False
+    for p in data.get('profiles', {}).get('list', []):
+        if p.get('name') == 'Ubuntu':
+            if p.get('colorScheme') != scheme:
+                p['colorScheme'] = scheme
+                modified = True
+    
+    if modified:
+        with open(path, 'w', encoding='utf-8') as f:
+            json.dump(data, f, indent=4)
+except Exception:
+    pass
+" 2>/dev/null || true
+fi
+
+# ------------------------------------------------------------------------------
+# 4. VI-SQL
+# ------------------------------------------------------------------------------
+VI_SQL_CONFIG="$HOME/.config/vi-sql/config.yaml"
+if [ -f "$VI_SQL_CONFIG" ]; then
+    if [ "$TARGET" = "light" ]; then
+        sed -i -E 's/([[:space:]]*currentStyle:).*/\1 transparent-light.yaml/' "$VI_SQL_CONFIG"
+    else
+        sed -i -E 's/([[:space:]]*currentStyle:).*/\1 transparent.yaml/' "$VI_SQL_CONFIG"
+    fi
+    pkill -USR1 vi-sql 2>/dev/null || true
+fi
+
+echo "Tema cambiado exitosamente a: $TARGET"

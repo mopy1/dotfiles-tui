@@ -1,0 +1,9 @@
+# Ignorar archivos temporales y caches
+*.swp
+*.swo
+*~
+.DS_Store
+*.bak
+*.bak.*
+lazy-lock.json.bak
+config/nvim/lazy-lock.json.bak

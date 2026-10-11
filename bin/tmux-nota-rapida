@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+SESSION="nota-rapida"
+
+# Detectar ruta de Obsidian (WSL vs Linux nativo/VM)
+if [ -d "/mnt/c/Users/lmc/Documents/Obsidian" ]; then
+    VAULT="/mnt/c/Users/lmc/Documents/Obsidian"
+else
+    VAULT="$HOME/Obsidian"
+fi
+
+NOTE="$VAULT/nota-rapida.md"
+
+# Asegurar que el directorio del vault y el archivo existan
+mkdir -p "$VAULT"
+touch "$NOTE"
+
+# Si la sesión no existe, la creamos en segundo plano con nvim listo
+if ! tmux has-session -t "$SESSION" 2>/dev/null; then
+    tmux new-session -d -s "$SESSION" -c "$VAULT" "nvim '$NOTE'"
+    tmux set-option -t "$SESSION" status off
+fi
+
+# Conectarse a la sesión persistente
+exec tmux attach-session -t "$SESSION"
